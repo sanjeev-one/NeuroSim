@@ -5,6 +5,7 @@ import torch.utils.data
 import torch.nn as nn
 from datetime import datetime
 from subprocess import call
+import wandb  # wandb integration
 from pytorch_quantization.utils import misc, make_path, hook
 from quantize import quantize_model, evaluate
 from dataset import get_imagenet, get_cifar10, get_cifar100
@@ -80,14 +81,21 @@ def parse_args():
     args.v_list = ast.literal_eval(args.v_list)
     return args
 
-
 def main():
-
     args = parse_args()
- 
+
+    # ---- wandb init ----
+    wandb.init(
+        project="Neurosim",  # Replace with your W&B project name
+        name=args.test_name,
+        config=args.__dict__,
+        notes="Automated run with hardware quantization simulation."
+    )
+    # --------------------
+
     torch.cuda.set_device(args.gpu)
     device = torch.device(f"cuda:{args.gpu}")
-    
+
     current_time = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     args.logdir = make_path.makepath(args,['log_interval','test_interval','logdir','epochs','gpu','ngpu','debug','data_path','model_path'])
     misc.logger.init(args.logdir, 'test_log_' + current_time)
@@ -101,7 +109,6 @@ def main():
     print("========================================\n")
 
     print(f"Running in-memory computing functional simulation of {args.model} on {args.dataset} dataset...")
-    #torch.cuda.set_device(args.gpu)
     torch.manual_seed(args.seed)
 
     criterion = nn.CrossEntropyLoss()
@@ -133,6 +140,9 @@ def main():
 
     accuracy = evaluate(model, args, criterion, data_loader_test, num_batches=args.num_batches, print_freq=1)
 
+    # Log accuracy to wandb
+    wandb.log({"test_accuracy": accuracy})
+
     # Uncomment to write outputs to a file
     # with open(f'results/{args.model}/accuracy/{args.test_name}.csv', 'a') as f:
     #    f.write(f'{args.output_noise},{accuracy}\n')
@@ -150,8 +160,19 @@ def main():
         print(args.bitcell)
         print("on/off ratio: ")
         print(args.on_state / args.off_state)
+        wandb.log({  # Optionally log hardware stats as a grouped dict
+            "hardware/subArray_size": args.sub_array,
+            "hardware/parallel_read": args.parallel_read,
+            "hardware/adc_precision": args.adc_precision,
+            "hardware/cell_precision": args.bitcell,
+            "hardware/on_off_ratio": args.on_state / args.off_state
+        })
 
         call(["/bin/bash", './layer_record_'+str(args.model)+'/trace_command.sh'])
+
+    # ---- wandb finish ----
+    wandb.finish()
+    # ----------------------
 
 if __name__ == '__main__':
     main()
