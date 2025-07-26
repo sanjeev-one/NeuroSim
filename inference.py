@@ -115,7 +115,7 @@ def main():
     args.data_path += args.dataset + '/'
 
     if args.dataset == 'imagenet':
-        data_loader_quant = get_imagenet(args.calib_batch_size, args.data_path, train=True, val=False, sample=True, model=args.model)
+        data_loader_quant = get_imagenet(args.calib_batch_size, args.data_path, train=False, val=True, sample=True, model=args.model)
         data_loader_test = get_imagenet(args.batch_size, args.data_path, train=False, val=True, sample=True, model=args.model)
     elif args.dataset == 'cifar100':
         data_loader_quant = get_cifar100(args.calib_batch_size, args.data_path, train=True, val=False, model=args.model)
